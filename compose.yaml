@@ -1,0 +1,41 @@
+services:
+  lossless-library-mirror:
+    container_name: lossless-library-mirror
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.12-slim-bookworm
+        RUN apt-get update \
+            && apt-get install -y --no-install-recommends ffmpeg ca-certificates curl unzip \
+            && curl -fL "https://github.com/bradsr1/lossless-library-mirror/raw/refs/heads/main/lossless-library-mirror-fixed.zip" -o /tmp/converter.zip \
+            && unzip /tmp/converter.zip -d /tmp/converter \
+            && mkdir -p /app /source/Volume1 /destination/Volume1 /config \
+            && cp -R /tmp/converter/app/. /app/ \
+            && rm -rf /var/lib/apt/lists/* /tmp/converter /tmp/converter.zip
+        ENV PYTHONUNBUFFERED=1 \
+            SOURCE_ROOT=/source \
+            DEST_ROOT=/destination \
+            CONFIG_ROOT=/config \
+            PORT=8090
+        EXPOSE 8090
+        HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+          CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/info', timeout=3)"
+        CMD ["python", "/app/app.py"]
+    ports:
+      - "8090:8090"
+    environment:
+      SOURCE_LABEL: "UGREEN NAS folders"
+      DEST_LABEL: "UGREEN NAS folders"
+    volumes:
+      - type: bind
+        source: /volume1
+        target: /source/Volume1
+        read_only: true
+      - type: bind
+        source: /volume1
+        target: /destination/Volume1
+      - type: bind
+        source: ./config
+        target: /config
+  
